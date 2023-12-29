@@ -7,118 +7,141 @@ using System;
 
 public class Main : MonoBehaviour
 {
-    //Text
-    public Text dropNumberText;
-    public Text dropsPerSecondText;
-    public Text bucketUpgradeText;
-    public Text rainText;
-    public Text cloudText;
-    public Text collectText;
-    public TMP_Text levelText;
-    public Text LevelUpRequirement;
+    //UI Text
+    
 
-    // Buttons
+    //UI Buttons
     public Button bucketUpgradeButton;
     public Button rainButton;
     public Button cloudButton;
     public Button collectButton;
 
+    //Game variables
     public double drops;
-
-    // Power-Ups
     public double rainPower; // dropsPerSeconds
-    private bool isRainActive = false;
-    private bool hasCalculatedOfflineProgress = false; // for collecting drops offline
     public double bucketUpgradePower; 
+
     // Cloud Drops variables
     private double cloudDrops;
     private int cloudDropLimit = 100; // Initial limit for drops in the cloud // I changed it from int to double
     private int cloudDropRate = 1;   // Initial rate at which drops are gathered per second // I changed it from int to double
-    private double timeSinceLastGathering; // Time since the last gathering
     private double gatheringInterval = 1; // Time interval for gathering in seconds
-    private double lastOnlineTimestamp;
-
+    
     // Levels
     public int bucketUpgradePowerUpLevel = 0;
     public int rainPowerUpLevel = 0;
     public int cloudDropsPowerUpLevel = 0;
-    private int totalPowerUpsUpgradedInLevel = 0;
+    public int totalPowerUpsUpgradedInLevel = 0;
     public int playerLevel = 1;
-    public int dropsRequiredForLevelUp;
     public int initialDropsRequired = 15; // CHANGE HERE BACK TO 85 AFTER YOU ARE DONE TESTING
     public int levelIncreaseAmount = 20;
-    // Other
-    public string levelUpSceneName = "LevelUpAnimation"; //name of animation scene
+    public int dropsRequiredForLevelUp;
+
+    public bool isRainActive = false;
+    private bool hasCalculatedOfflineProgress = false; // for collecting drops offline
+    private double timeSinceLastGathering; // Time since the last gathering
+    private double lastOnlineTimestamp;
     private Vector2 initialSwipePos;
+    
+    // Other
+    //public string levelUpSceneName = "LevelUpAnimation"; //name of animation scene
+    //public OfflineGatheringManager offlineGatheringManager;
+    public SceneLoader sceneLoader;
+    public MainUI mainUI;
+    public LevelUpUIManager levelUpUIManager;
 
-   
+    // Public properties
+    public int TotalPowerUpsUpgradedInLevel
+    {
+        get { return totalPowerUpsUpgradedInLevel; }
+        set { totalPowerUpsUpgradedInLevel = value; }
+    }
 
+    public double CloudDrops
+    {
+        get {return cloudDrops; }
+        set {cloudDrops = value; }
+    }
+
+    public int CloudDropLimit
+    {
+        get {return cloudDropLimit; }
+        set {cloudDropLimit = value; }
+    }
+
+    public int CloudDropRate
+    {
+        get {return cloudDropRate; }
+        set {cloudDropRate = value; }
+    }
+
+    public double TimeSinceLastGathering
+    {
+        get {return timeSinceLastGathering; }
+        set {timeSinceLastGathering = value; }
+    }
+
+    public double LastOnlineTimestamp
+    {
+        get {return lastOnlineTimestamp; }
+        set {lastOnlineTimestamp = value; }
+    }
+
+    public bool HasCalculatedOfflineProgress
+    {
+        get {return hasCalculatedOfflineProgress; }
+        set {hasCalculatedOfflineProgress = value; }
+    }
+
+
+
+//===================================================================================================================
+//===================================================================================================================
+
+
+    public static Main Instance { get; private set; }
+
+    private void Awake()
+    {
+        Debug.Log("Main Awake is being called.");
+        if (Instance == null)
+        {
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+            Debug.Log("Main Instance is set and will not be destroyed on load.");
+        }
+        else if (Instance != this)
+        {
+            Debug.Log("Another instance of Main found, which will be destroyed.");
+            Destroy(gameObject);
+        }
+    }
+
+
+
+//===================================================================================================================
+//===================================================================================================================
     void Start()
     {   
         //PlayerPrefs.DeleteAll();
+        //Debug.Log("global initialDropsRequired: " + initialDropsRequired);
+
 
         initialDropsRequired = 15;    // CHANGE HERE BACK TO 85 AFTER YOU ARE DONE TESTING
-        //Debug.Log("global initialDropsRequired: " + initialDropsRequired);
         InvokeRepeating("IncrementDrops", 1.0f, 1.0f); // Calls IncrementDrops every 1 second.
         InvokeRepeating("Save", 1.0f, 1.0f); // Calls IncrementDrops every 1 second.
-        Load();
-        UpdateUI();
-
-        //for collecting drops offline
+        SaveLoadManager.Instance.LoadGame(this); //Load
         CalculateOfflineProgress(); // Calculate any offline progress
-    }
-
-    public void Load()
-    {
-        drops = double.Parse(PlayerPrefs.GetString("drops","0"));
-        rainPower = double.Parse(PlayerPrefs.GetString("rainPower","0"));
-        bucketUpgradePower = double.Parse(PlayerPrefs.GetString("bucketUpgradePower","1"));
-        
-        playerLevel = PlayerPrefs.GetInt("playerLevel", 1);
-        bucketUpgradePowerUpLevel = PlayerPrefs.GetInt("bucketUpgradePowerUpLevel", 0);
-        rainPowerUpLevel = PlayerPrefs.GetInt("rainPowerUpLevel", 0);
-        cloudDropsPowerUpLevel = PlayerPrefs.GetInt("cloudDropsPowerUpLevel", 0);
-        totalPowerUpsUpgradedInLevel = PlayerPrefs.GetInt("totalPowerUpsUpgradedInLevel", 0);
-
-        initialDropsRequired = PlayerPrefs.GetInt("initialDropsRequired", 15);
-            // CHANGE HERE BACK TO 85 AFTER YOU ARE DONE TESTING
-
-        cloudDrops = double.Parse(PlayerPrefs.GetString("cloudDrops", "0"));
-        cloudDropLimit = int.Parse(PlayerPrefs.GetString("cloudDropLimit", "100"));
-        cloudDropRate = int.Parse(PlayerPrefs.GetString("cloudDropRate", "1"));
-        timeSinceLastGathering = double.Parse(PlayerPrefs.GetString("timeSinceLastGathering", "0"));
-        
-        //lastOnlineTimestamp = double.Parse(PlayerPrefs.GetString("lastOnlineTimestamp", "0"));  //load the last online timestamp
-        //for collecting drops offline
-        lastOnlineTimestamp = double.Parse(PlayerPrefs.GetString("lastOnlineTimestamp", GetTimestamp().ToString()));
-        CalculateOfflineProgress();
-
+        mainUI.UpdateUI();
+        //levelUpUIManager.UpdateLevelUpOptionsUI();
     }
 
     public void Save()
     {
-        PlayerPrefs.SetString("drops", drops.ToString());
-        PlayerPrefs.SetString("rainPower", rainPower.ToString());
-        PlayerPrefs.SetString("bucketUpgradePower", bucketUpgradePower.ToString());
+        SaveLoadManager.Instance.SaveGame(this);
         
-        PlayerPrefs.SetInt("playerLevel", playerLevel);
-        PlayerPrefs.SetInt("bucketUpgradePowerUpLevel", bucketUpgradePowerUpLevel);
-        PlayerPrefs.SetInt("rainPowerUpLevel", rainPowerUpLevel);
-        PlayerPrefs.SetInt("cloudDropsPowerUpLevel", cloudDropsPowerUpLevel);
-        PlayerPrefs.SetInt("totalPowerUpsUpgradedInLevel", totalPowerUpsUpgradedInLevel);
-
-        PlayerPrefs.SetInt("initialDropsRequired", initialDropsRequired);
-
-        PlayerPrefs.SetString("cloudDrops", cloudDrops.ToString());
-        PlayerPrefs.SetString("cloudDropLimit", cloudDropLimit.ToString());
-        PlayerPrefs.SetString("cloudDropRate", cloudDropRate.ToString());
-        PlayerPrefs.SetString("timeSinceLastGathering", timeSinceLastGathering.ToString());
-
-            // save the current timestamp
-        //lastOnlineTimestamp = GetTimestamp();
-        //PlayerPrefs.SetString("lastOnlineTimestamp", lastOnlineTimestamp.ToString());
     }
-//for collecting drops offline
+    //for collecting drops offline
     void OnApplicationPause(bool pauseStatus)
     {
         if(pauseStatus) // Game is being paused
@@ -132,47 +155,40 @@ public class Main : MonoBehaviour
         SaveLastOnlineTimestamp();
     }
 
-    void SaveLastOnlineTimestamp()
-    {
-        double timestamp = GetTimestamp();
-        //Debug.Log("Saving last online timestamp: " + timestamp);
-        PlayerPrefs.SetString("lastOnlineTimestamp", timestamp.ToString());
-        PlayerPrefs.Save();
-    }
+//===================================================================================================================
+//===================================================================================================================
 
-    void CalculateOfflineProgress()
+    public void CalculateOfflineProgress()
     {
         if (!hasCalculatedOfflineProgress && lastOnlineTimestamp > 0 && playerLevel >= 4 && cloudDropsPowerUpLevel >= 1)
         {
-            double currentTime = GetTimestamp();
-            //Debug.Log("Current time: " + currentTime);
-            
+            double currentTime = GetTimestamp();            
             double offlineDuration = currentTime - lastOnlineTimestamp;
-            //Debug.Log("Offline duration (in seconds): " + offlineDuration);
-            
-            double offlineGatheredDrops = cloudDropRate * offlineDuration; 
-            //Debug.Log("Expected offline gathered drops: " + offlineGatheredDrops);
+            double offlineGatheredDrops = cloudDropRate * offlineDuration;
 
             double availableSpace = cloudDropLimit - cloudDrops;
             double dropsToAdd = Math.Min(offlineGatheredDrops, availableSpace);
-            
-            //Debug.Log("Drops to add (after considering available space): " + dropsToAdd);
 
             cloudDrops += dropsToAdd; 
-
             SaveLastOnlineTimestamp(); // Update the last online timestamp to the current time
             hasCalculatedOfflineProgress = true; // Set the flag so this doesn't run again
         }
     }
 
-
-
-    double GetTimestamp()
+    public void SaveLastOnlineTimestamp()
+    {
+        double timestamp = GetTimestamp();
+        PlayerPrefs.SetString("lastOnlineTimestamp", timestamp.ToString());
+        PlayerPrefs.Save();
+    }
+    //Don't need this in Utility anymore
+    public static double GetTimestamp()
     {
         return (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
     }
-
-
+   
+//===================================================================================================================
+//===================================================================================================================
     public void ResetPlayerPrefs()
     {
         PlayerPrefs.DeleteAll(); // This clears all PlayerPrefs data.
@@ -197,21 +213,20 @@ public class Main : MonoBehaviour
         AdjustCloudDropsPowerUp();
        
     }
-
-    void UpdateUI()
+/*
+    void UpdateUI() //made it public, it only had void before
     {
         dropsRequiredForLevelUp = initialDropsRequired + (levelIncreaseAmount * (playerLevel - 1));
         //dropsRequiredForLevelUp = Mathf.RoundToInt(initialDropsRequired * Mathf.Pow(levelIncreaseAmount, playerLevel - 1));
         //Debug.Log("initialDropsRequired: " + initialDropsRequired + "\ndropsRequiredForLevelUp: " + dropsRequiredForLevelUp);
 
-        dropNumberText.text = " " + drops;
+        dropNumberText.text = " " + Math.Floor(drops);
         dropsPerSecondText.text = rainPower + "/sec";
         bucketUpgradeText.text = "Bucket Upgrade\n" + bucketUpgradePower + " / tap" + "\n Level: " + bucketUpgradePowerUpLevel;
         rainText.text = "Rain\n" + rainPower + " / sec" + "\n Level: " + rainPowerUpLevel;
         cloudText.text = "Cloud Drops" + "\nLimit: " + cloudDropLimit  + "\nRate: " + cloudDropRate  +"\n Level: " + cloudDropsPowerUpLevel;
         //collectText.text = "Collect:\n" + cloudDrops;
         collectText.text = "Collect:\n" + Math.Floor(cloudDrops).ToString();
-
 
         levelText.text = "Lv " + playerLevel; // Update the level text
         LevelUpRequirement.text = "FIRE! FILL UNTIL\n" + dropsRequiredForLevelUp;
@@ -220,16 +235,14 @@ public class Main : MonoBehaviour
         //bucketUpgradeButton.interactable = (playerLevel >= 2 && bucketUpgradePowerUpLevel >= 1);
         //rainButton.interactable = (playerLevel >= 3 && rainPowerUpLevel >= 1);
         //cloudButton.interactable = (playerLevel >= 4 && cloudDropsPowerUpLevel >= 1);
-
     }
-
-
+*/
     void Update()
     {
-        // Calculate offline progress
-        //CalculateOfflineProgress();
-
-        UpdateUI();
+        dropsRequiredForLevelUp = initialDropsRequired + (levelIncreaseAmount * (playerLevel - 1));
+        //dropsRequiredForLevelUp = Mathf.RoundToInt(initialDropsRequired * Mathf.Pow(levelIncreaseAmount, playerLevel - 1));
+        //Debug.Log("initialDropsRequired: " + initialDropsRequired + "\ndropsRequiredForLevelUp: " + dropsRequiredForLevelUp);
+        mainUI.UpdateUI();
 
         if (Input.GetMouseButtonDown(0))
         {
@@ -246,18 +259,7 @@ public class Main : MonoBehaviour
                 TryLevelUp();
             }
         }
-/*
-        if (playerLevel >= 4 && cloudDropsPowerUpLevel >= 1)
-        {
-            //Debug.Log("Gathering drops...");
-            GatherDrops();
-            timeSinceLastGathering = 0; // Reset the timer
-        }
-        else
-        {
-            Debug.Log("Not gathering drops. Player Level: " + playerLevel + ", Cloud Power-Up Level: " + cloudDropsPowerUpLevel);
-        }
-*/
+
         if (playerLevel >= 4 && cloudDropsPowerUpLevel >= 1)
         {
             // Update the time since the last gathering
@@ -270,98 +272,117 @@ public class Main : MonoBehaviour
                 timeSinceLastGathering = 0; // Reset the timer
             }
         }
+        
     }
-/*
-    void ResetGatheringTimer()
-    {
-        timeSinceLastGathering = 0;
-    }
-*/
-    void TryLevelUp()
+
+    void TryLevelUp() //made it public, it only had void before
     {
         if (drops >= dropsRequiredForLevelUp)
         {
             drops -= dropsRequiredForLevelUp;
             playerLevel++;
 
-            UpdateUI(); // Update the UI after leveling up
+            mainUI.UpdateUI(); // Update the UI after leveling up
             StartCoroutine(LevelUpAnimation());
         }
         // You can add an else statement here for additional feedback if the player doesn't have enough drops
     }
 
-    IEnumerator LevelUpAnimation()
+    // Call this before loading a new scene
+    public void DisableMainUI()
     {
-        // Load the level-up scene
-        SceneManager.LoadScene(levelUpSceneName, LoadSceneMode.Additive);
-
-        // Wait for a few seconds (adjust this based on your animation length)
-        yield return new WaitForSeconds(1.55f); // Example: 3 seconds
-
-        // Unload the level-up scene
-        SceneManager.UnloadSceneAsync(levelUpSceneName);
-
-        // Load back the main scene (optional, if you want to return to the main scene)
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        if (mainUI != null)
+        {
+            mainUI.enabled = false;  // This assumes mainUI is a component that can be enabled/disabled.
+        }
     }
 
-    // For the 2 easy power-up buttons
+    // Call this when returning to the main scene
+    public void EnableMainUI()
+    {
+        if (mainUI != null)
+        {
+            mainUI.enabled = true;
+            mainUI.UpdateUI();  // Update the UI now that we're back in the main scene.
+        }
+    }
+
+    public IEnumerator LevelUpAnimation()
+    {
+        // Disable the MainUI before loading the level up animation scene
+        DisableMainUI();
+
+        // Load the level-up scene
+        SceneManager.LoadScene("LevelUpAnimation", LoadSceneMode.Additive);
+
+        // Wait for the animation to complete
+        yield return new WaitForSeconds(1.55f);
+
+        // Load the level-up upgrade scene
+        SceneManager.LoadScene("LevelUpUpgrade");
+    }
+
+    public void OnUpgradeChoiceMade()
+    {
+        // Save state if necessary
+        SaveLoadManager.Instance.SaveGame(this);
+
+        // Load the main scene and enable MainUI
+        SceneManager.LoadScene("Main", LoadSceneMode.Single);
+        SceneManager.sceneLoaded += (scene, mode) =>
+        {
+            if (scene.name == "Main")
+            {
+                EnableMainUI();
+            }
+        };
+    }
+    
+
+
+//===================================================================================================================
+//===================================================================================================================
+    //Main Bucket button
     public void Clicked()
     {
         drops += bucketUpgradePower;
     }
 
+    //Level Up Bucket Upgrade power-up
+    public void BucketUpgradeClicked()
+    {
+        
+    }
+
+    //Level Up Rain power-up
+    public void RainClicked()
+    {
+        
+    }
+    //For auto-incrementation per seconds in Start()
+    //Connected to Rain power-up
     private void IncrementDrops()
     {
         drops += rainPower;
     }
 
-    // Power-up buttons
-    public void BucketUpgradeClicked()
-    {
-        if (playerLevel >= 2 && totalPowerUpsUpgradedInLevel < playerLevel - 1)
-        {
-            bucketUpgradePowerUpLevel++;
-            totalPowerUpsUpgradedInLevel++;
-            bucketUpgradePower += 1;
-        }
-    }
-
-    public void RainClicked()
-    {
-        if (playerLevel >= 3 && totalPowerUpsUpgradedInLevel < playerLevel - 1)
-        {
-            if (!isRainActive)
-            {
-                rainPowerUpLevel++;
-                totalPowerUpsUpgradedInLevel++;
-                rainPower += 5;
-                isRainActive = false;
-            }
-        }
-    }
-
+    //Level Up Cloud power-up
     public void CloudClicked()
     {
-        if (playerLevel >= 4 && totalPowerUpsUpgradedInLevel < playerLevel - 1)
-        {
-            cloudDropsPowerUpLevel++;
-            totalPowerUpsUpgradedInLevel++;
-            
-            AdjustCloudDropsPowerUp();
-        }
+        
     }
 
     
-    // For Cloud Drop functionality
+    // For Cloud Drop functionality; All below
+    //For the button that collects the drops in Cloud
     public void CollectFromCloud()
     {
         // Collect all drops in the cloud
         drops += cloudDrops;
-        cloudDrops = 0; // Reset the drops in the cloud after collection
-
-        
+        cloudDrops = 0; // Reset the drops in the cloud after collection  
     }
+//===================================================================================================================
+//===================================================================================================================
 
     void GatherDrops()
     {
@@ -373,10 +394,9 @@ public class Main : MonoBehaviour
             //cloudDrops = Math.Floor(cloudDrops);
         }
 
-        
     }
 
-    void AdjustCloudDropsPowerUp()
+    public void AdjustCloudDropsPowerUp() // made public
     {
         // Define base values and growth factors
         double baseLimit = 100; // Initial limit   // I changed it from int to double
@@ -386,10 +406,5 @@ public class Main : MonoBehaviour
         // Use the formula to calculate new values
         cloudDropLimit = (int)(baseLimit * Math.Pow(growthFactor, cloudDropsPowerUpLevel));
         cloudDropRate = (int)(baseRate * Math.Pow(growthFactor, cloudDropsPowerUpLevel));
-
-        
-    }
-
-    
-
+    } 
 }
